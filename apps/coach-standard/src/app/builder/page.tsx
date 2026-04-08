@@ -528,8 +528,8 @@ function SessionBuilderContent() {
                     {/* ── Floating Player Insights Panel ──────────────────── */}
                     <AnimatePresence>
                         {showInsightsPanel && currentPlayer && (() => {
-                            const prefs: any = (currentPlayer as any).trainingPreferences;
-                            const hasPrefs = !!prefs;
+                            const preferences = currentPlayer.trainingPreferences;
+                            const hasPrefs = !!preferences;
                             const PREF_FEATURES = [
                                 { key: 'rallies',   label: 'Rallies',           color: 'from-emerald-600/60 to-emerald-400' },
                                 { key: 'points',    label: 'Points Play',       color: 'from-red-600/60 to-red-400' },
@@ -538,9 +538,9 @@ function SessionBuilderContent() {
                                 { key: 'baskets',   label: 'Baskets (Feeding)', color: 'from-orange-600/60 to-orange-400' },
                                 { key: 'serves',    label: 'Serves & Returns',  color: 'from-cyan-600/60 to-cyan-400' },
                             ] as const;
-                            const priorities = hasPrefs ? PREF_FEATURES.filter(f => prefs[f.key]?.isPriority) : [];
+                            const priorities = hasPrefs ? PREF_FEATURES.filter(f => preferences[f.key]?.isPriority) : [];
                             const sorted = hasPrefs
-                                ? [...PREF_FEATURES].sort((a, b) => (prefs[b.key]?.value ?? 0) - (prefs[a.key]?.value ?? 0))
+                                ? [...PREF_FEATURES].sort((a, b) => (preferences[b.key]?.value ?? 0) - (preferences[a.key]?.value ?? 0))
                                 : PREF_FEATURES;
                             return (
                                 <motion.div
@@ -581,7 +581,7 @@ function SessionBuilderContent() {
                                         {hasPrefs ? (
                                             <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-3">
                                                 {sorted.map(f => {
-                                                    const pref = prefs[f.key];
+                                                    const pref = preferences[f.key];
                                                     const pct = ((pref?.value ?? 0) / 5) * 100;
                                                     const isPriority = pref?.isPriority;
                                                     return (

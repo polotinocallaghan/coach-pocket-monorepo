@@ -317,7 +317,7 @@ export default function PlayerDashboardPage() {
                 <CoachNotebook playerId={playerId} />
 
                 {/* Training Preferences (read-only view of player's own settings) */}
-                <TrainingPreferencesViewer preferences={(player as any).trainingPreferences} />
+                <TrainingPreferencesViewer preferences={player.trainingPreferences} />
             </div>
 
             {/* ── MATCH HISTORY ───────────────────────────────────────────── */}

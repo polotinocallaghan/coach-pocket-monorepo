@@ -44,6 +44,7 @@ import {
     UserProfile,
     NotebookNote,
     Notification,
+    PlayerFeedback,
     WeekDay,
     ProgramWeek,
     TrainingProgram
@@ -1335,30 +1336,6 @@ class DataStore {
         this.notifications.push(notification);
         this.saveToLocalStorage();
         this.notify();
-    }
-
-    markNotificationRead(id: string) {
-        const index = this.notifications.findIndex(n => n.id === id);
-        if (index !== -1) {
-            this.notifications[index].read = true;
-            this.saveToLocalStorage();
-            this.notify();
-        }
-    }
-
-    markAllNotificationsRead(userId: string) {
-        this.notifications = this.notifications.map(n => {
-            if (n.userId === userId || n.userId === 'all') {
-                return { ...n, read: true };
-            }
-            return n;
-        });
-        this.saveToLocalStorage();
-    }
-
-    clearNotification(id: string) {
-        this.notifications = this.notifications.filter(n => n.id !== id);
-        this.saveToLocalStorage();
     }
 
     // Notebook methods

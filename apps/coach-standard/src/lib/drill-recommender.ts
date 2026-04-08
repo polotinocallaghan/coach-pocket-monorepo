@@ -173,7 +173,7 @@ function analyzeCoachNotes(matches: CalendarEvent[]): PerformanceGap[] {
     recentMatches.forEach(m => {
         if (m.notes) allTexts.push(m.notes.toLowerCase());
         if (m.matchNotes) {
-            m.matchNotes.forEach(n => allTexts.push(n.text.toLowerCase()));
+            m.matchNotes.forEach((n: { text: string }) => allTexts.push(n.text.toLowerCase()));
         }
     });
 
@@ -229,9 +229,9 @@ function analyzeVideoClips(matches: CalendarEvent[]): PerformanceGap[] {
         .slice(0, 10);
 
     recentMatches.forEach(m => {
-        m.videoClips?.forEach(clip => {
+        m.videoClips?.forEach((clip: VideoClip) => {
             // Count tags
-            clip.tags?.forEach(tag => {
+            clip.tags?.forEach((tag: string) => {
                 tagCounts[tag] = (tagCounts[tag] || 0) + 1;
                 // Weight improvement/critical clips higher
                 if (clip.severity === 'improvement' || clip.severity === 'critical') {
@@ -253,7 +253,7 @@ function analyzeVideoClips(matches: CalendarEvent[]): PerformanceGap[] {
         });
 
         // Also check learning chapter titles
-        m.learningChapters?.forEach(ch => {
+        m.learningChapters?.forEach((ch: { title: string }) => {
             const title = ch.title.toLowerCase();
             Object.entries(AREA_KEYWORDS).forEach(([area, keywords]) => {
                 keywords.forEach(kw => {

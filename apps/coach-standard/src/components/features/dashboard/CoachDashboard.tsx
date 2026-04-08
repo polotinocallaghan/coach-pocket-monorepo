@@ -6,7 +6,7 @@ import {
     Calendar, Clock, UserCheck, Dumbbell, BookOpen, Users, 
     MessageSquare, Plus, TrendingUp, Trophy, ChevronDown, ChevronUp,
     MoreVertical, ArrowRight, Play, Settings, Bell,
-    Activity, Eye, ChevronRight, CheckCircle2
+    Activity, Eye, ChevronRight, CheckCircle2, Star
 } from 'lucide-react';
 import { dataStore, CalendarEvent } from '@coach-pocket/core';
 import { useDataStore } from '@/lib/useDataStore';
