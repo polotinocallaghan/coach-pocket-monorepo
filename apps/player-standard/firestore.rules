@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── PERFIL DEL USUARIO ──────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if request.auth != null; 
+      allow write: if request.auth != null && request.auth.uid == userId;
+
+      // ─── COLECCIONES ANIDADAS (Ejercicios, Sesiones, Calendario, etc.) ──────
+      match /{allChildren=**} {
+         // Owner can always read/write
+         allow read, write: if request.auth != null && request.auth.uid == userId;
+         
+         // Connected players can READ their coach's data (calendar, sessions, exercises, notes)
+         allow read: if request.auth != null
+           && exists(/databases/$(database)/documents/users/$(request.auth.uid)/profile/data)
+           && get(/databases/$(database)/documents/users/$(request.auth.uid)/profile/data).data.connectedCoachId == userId;
+      }
+    }
+
+    // ─── CONEXIONES (Network) ────────────────────────────────────────────────
+    match /connections/{id} {
+      allow read: if request.auth != null && (
+        request.auth.uid == resource.data.requesterId || 
+        request.auth.uid == resource.data.recipientId
+      );
+      
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.requesterId;
+        
+      allow update: if request.auth != null && (
+        request.auth.uid == resource.data.requesterId || 
+        request.auth.uid == resource.data.recipientId
+      );
+      
+      allow delete: if false; 
+    }
+
+    // ─── CHATS ───────────────────────────────────────────────────────────────
+    match /chats/{chatId} {
+      allow read, write: if request.auth != null && request.auth.uid in resource.data.participants;
+      allow create: if request.auth != null && request.auth.uid in request.resource.data.participants;
+    }
+    match /chats/{chatId}/messages/{messageId} {
+       allow read, update, delete: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+       allow create: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+    }
+  }
+}

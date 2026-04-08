@@ -1,0 +1,27 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Archivos de sesiones (vídeos/imágenes)
+    match /sessions/{sessionId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null 
+                   && request.resource.size < 30 * 1024 * 1024
+                   && request.resource.contentType.matches('video/.*|image/.*');
+    }
+
+    // Subidas genéricas a carpetas por usuario
+    match /users/{userId}/{allPaths=**} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId
+                   && request.resource.size < 30 * 1024 * 1024
+                   && request.resource.contentType.matches('video/.*|image/.*');
+    }
+
+    // Bloqueo total por defecto
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

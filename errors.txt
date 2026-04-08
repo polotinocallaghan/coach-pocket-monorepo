@@ -1,0 +1,8 @@
+﻿src/app/builder/page.tsx(897,76): error TS2322: Type '{ prefs: TrainingPreferences; }' is not assignable to type 'IntrinsicAttributes & { preferences?: TrainingPreferences | undefined; }'.
+  Property 'prefs' does not exist on type 'IntrinsicAttributes & { preferences?: TrainingPreferences | undefined; }'.
+src/lib/drill-recommender.ts(10,52): error TS2307: Cannot find module './store' or its corresponding type declarations.
+src/lib/drill-recommender.ts(176,34): error TS7006: Parameter 'n' implicitly has an 'any' type.
+src/lib/drill-recommender.ts(232,31): error TS7006: Parameter 'clip' implicitly has an 'any' type.
+src/lib/drill-recommender.ts(234,32): error TS7006: Parameter 'tag' implicitly has an 'any' type.
+src/lib/drill-recommender.ts(256,37): error TS7006: Parameter 'ch' implicitly has an 'any' type.
+src/lib/drill-recommender.ts(375,39): error TS7006: Parameter 'tag' implicitly has an 'any' type.

@@ -1,0 +1,406 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { dataStore, Exercise, Session, SessionExercise } from '@/lib/store';
+import { cn, generateId } from '@/lib/utils';
+import { Search, ArrowLeft, Check, Save, Clock, Filter, ChevronDown, Star, X } from 'lucide-react';
+
+export default function SessionBuilderPage() {
+    const router = useRouter();
+    const [exercises] = useState<Exercise[]>(dataStore.getExercises());
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
+    const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
+    // Session metadata - collected first
+    const [sessionDate, setSessionDate] = useState('');
+    const [sessionTime, setSessionTime] = useState('');
+    const [sessionTitle, setSessionTitle] = useState('');
+    const [sessionType, setSessionType] = useState<'practice' | 'match' | 'match-prep'>('practice');
+    const [showDateModal, setShowDateModal] = useState(true);
+    const [sessionConfigured, setSessionConfigured] = useState(false);
+
+    // Comprehensive filter state
+    const [filters, setFilters] = useState({
+        drillType: 'all' as string,
+        level: 'all' as string,
+        ageGroup: 'all' as string,
+        needsCoach: 'all' as string,
+        playerCount: [1, 10] as [number, number],
+        ballsNeeded: 'all' as string,
+        focusAreas: [] as string[],
+        minRating: 0,
+        sortBy: 'recent' as string,
+    });
+
+    const filteredExercises = exercises.filter(exercise => {
+        // Text search
+        if (searchTerm) {
+            const matchesSearch = exercise.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                exercise.description.toLowerCase().includes(searchTerm.toLowerCase());
+            if (!matchesSearch) return false;
+        }
+
+        // Dropdown filters
+        if (filters.drillType !== 'all' && exercise.drillType !== filters.drillType) return false;
+        if (filters.level !== 'all' && exercise.level !== filters.level) return false;
+        if (filters.ageGroup !== 'all' && exercise.ageGroup !== filters.ageGroup) return false;
+
+        // Boolean filter
+        if (filters.needsCoach !== 'all') {
+            const needsCoach = filters.needsCoach === 'yes';
+            if (exercise.needsCoach !== needsCoach) return false;
+        }
+
+        // Range filters
+        if (exercise.playerCount < filters.playerCount[0] || exercise.playerCount > filters.playerCount[1]) return false;
+
+        // Multi-select filters
+        if (filters.focusAreas.length > 0 && !filters.focusAreas.some(f => exercise.focusAreas.includes(f as any))) return false;
+        if (filters.ballsNeeded !== 'all' && exercise.ballsNeeded !== filters.ballsNeeded) return false;
+
+        // Rating filter
+        if (exercise.rating < filters.minRating) return false;
+
+        return true;
+    }).sort((a, b) => {
+        if (filters.sortBy === 'most-used') return b.timesUsed - a.timesUsed;
+        if (filters.sortBy === 'highest-rated') return b.rating - a.rating;
+        if (filters.sortBy === 'alphabetical') return a.title.localeCompare(b.title);
+        return 0;
+    });
+
+    const toggleFocusArea = (area: string) => {
+        setFilters(prev => ({
+            ...prev,
+            focusAreas: prev.focusAreas.includes(area)
+                ? prev.focusAreas.filter(f => f !== area)
+                : [...prev.focusAreas, area]
+        }));
+    };
+
+    const clearAllFilters = () => {
+        setSearchTerm('');
+        setFilters({
+            drillType: 'all',
+            level: 'all',
+            ageGroup: 'all',
+            needsCoach: 'all',
+            playerCount: [1, 10],
+            ballsNeeded: 'all',
+            focusAreas: [],
+            minRating: 0,
+            sortBy: 'recent',
+        });
+    };
+
+    const hasActiveFilters = searchTerm || filters.drillType !== 'all' || filters.level !== 'all' ||
+        filters.ageGroup !== 'all' || filters.needsCoach !== 'all' || filters.ballsNeeded !== 'all' ||
+        filters.focusAreas.length > 0 || filters.minRating > 0 || filters.sortBy !== 'recent';
+
+    const toggleExerciseSelection = (exerciseId: string) => {
+        if (selectedExercises.includes(exerciseId)) {
+            setSelectedExercises(selectedExercises.filter(id => id !== exerciseId));
+        } else {
+            setSelectedExercises([...selectedExercises, exerciseId]);
+        }
+    };
+
+    const handleConfigureSession = (title: string, type: 'practice' | 'match' | 'match-prep', date: string, time: string) => {
+        setSessionTitle(title);
+        setSessionType(type);
+        setSessionDate(date);
+        setSessionTime(time);
+        setSessionConfigured(true);
+        setShowDateModal(false);
+    };
+
+    const handleSaveSession = () => {
+        const sessionExercises: SessionExercise[] = selectedExercises.map((exerciseId, index) => ({
+            id: generateId(),
+            exerciseId,
+            block: 'warm-up', // Will be auto-assigned based on tags later
+            order: index,
+            duration: exercises.find(e => e.id === exerciseId)?.duration,
+        }));
+
+        const newSession: Session = {
+            id: generateId(),
+            title: sessionTitle || 'New Session',
+            type: sessionType,
+            isTemplate: false,
+            exercises: sessionExercises,
+            createdAt: new Date(),
+        };
+
+        dataStore.addSession(newSession);
+
+        // Create calendar event if date is set
+        if (sessionDate) {
+            const calendarEvent = {
+                id: generateId(),
+                title: sessionTitle || 'New Session',
+                date: new Date(sessionDate),
+                time: sessionTime,
+                type: sessionType === 'match' ? 'match' as const : 'session' as const,
+                sessionId: newSession.id,
+                completed: false,
+            };
+            dataStore.addCalendarEvent(calendarEvent);
+        }
+
+        router.push('/');
+    };
+
+    const totalDuration = selectedExercises.reduce((total, exerciseId) => {
+        const exercise = exercises.find(e => e.id === exerciseId);
+        return total + (exercise?.duration || 0);
+    }, 0);
+
+    return (
+        <div className="min-h-screen bg-slate-900">
+            {/* Date Selection Modal - Shows First */}
+            {showDateModal && (
+                <DateSelectionModal
+                    onConfirm={handleConfigureSession}
+                />
+            )}
+
+            {/* Only show content after session is configured */}
+            {sessionConfigured && (
+                <>
+                    {/* Header */}
+                    <header className="bg-slate-800/50 border-b border-slate-700 sticky top-0 z-10">
+                        <div className="max-w-7xl mx-auto px-6 py-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <button onClick={() => router.push('/')} className="p-2 hover:bg-slate-700 rounded-lg transition">
+                                        <ArrowLeft className="w-5 h-5 text-slate-400" />
+                                    </button>
+                                    <div>
+                                        <h1 className="text-2xl font-bold text-white">{sessionTitle || 'New Session'}</h1>
+                                        <p className="text-sm text-slate-400">
+                                            {sessionDate && new Date(sessionDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                                            {sessionTime && ` at ${sessionTime}`}
+                                            {' • '}
+                                            <span className="capitalize">{sessionType}</span>
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    {selectedExercises.length > 0 && (
+                                        <div className="flex items-center gap-3 bg-slate-700/50 px-4 py-2 rounded-lg">
+                                            <div className="text-sm">
+                                                <span className="text-green-400 font-bold">{selectedExercises.length}</span>
+                                                <span className="text-slate-400"> exercises</span>
+                                            </div>
+                                            <div className="w-px h-6 bg-slate-600"></div>
+                                            <div className="flex items-center gap-1 text-sm">
+                                                <Clock className="w-4 h-4 text-slate-400" />
+                                                <span className="text-white font-bold">{totalDuration}</span>
+                                                <span className="text-slate-400">min</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={handleSaveSession}
+                                        disabled={selectedExercises.length === 0}
+                                        className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <Save className="w-4 h-4" />
+                                        Save Session
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Search and Filters */}
+                    <div className="max-w-7xl mx-auto px-6 py-6">
+                        <div className="flex flex-col md:flex-row gap-4">
+                            {/* Search */}
+                            <div className="flex-1 relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search exercises..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-green-500"
+                                />
+                            </div>
+
+                            {/* Category Filter */}
+                            <select
+                                value={categoryFilter}
+                                onChange={(e) => setCategoryFilter(e.target.value)}
+                                className="px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-green-500"
+                            >
+                                <option value="all">All Categories</option>
+                                <option value="basket">Baskets</option>
+                                <option value="drill">Drills</option>
+                                <option value="points">Points</option>
+                                <option value="game">Games</option>
+                            </select>
+
+                            {/* Difficulty Filter */}
+                            <select
+                                value={difficultyFilter}
+                                onChange={(e) => setDifficultyFilter(e.target.value)}
+                                className="px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-green-500"
+                            >
+                                <option value="all">All Difficulties</option>
+                                <option value="easy">Easy</option>
+                                <option value="medium">Medium</option>
+                                <option value="hard">Hard</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Exercise Grid */}
+                    <div className="max-w-7xl mx-auto px-6 pb-12">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {filteredExercises.map((exercise) => {
+                                const isSelected = selectedExercises.includes(exercise.id);
+                                return (
+                                    <div
+                                        key={exercise.id}
+                                        onClick={() => toggleExerciseSelection(exercise.id)}
+                                        className={cn(
+                                            "group relative bg-slate-800 border rounded-xl p-6 cursor-pointer transition-all",
+                                            isSelected
+                                                ? "border-green-500 ring-2 ring-green-500/20 bg-green-500/5"
+                                                : "border-slate-700 hover:border-green-500/50"
+                                        )}
+                                    >
+                                        {/* Selection Indicator */}
+                                        <div className={cn(
+                                            "absolute top-4 right-4 w-6 h-6 rounded-full border-2 flex items-center justify-center transition",
+                                            isSelected
+                                                ? "bg-green-500 border-green-500"
+                                                : "border-slate-600 group-hover:border-green-500"
+                                        )}>
+                                            {isSelected && <Check className="w-4 h-4 text-white" />}
+                                        </div>
+
+                                        <div className="flex items-start justify-between mb-4 pr-8">
+                                            <span className={cn(
+                                                "px-3 py-1 rounded-full text-xs font-semibold",
+                                                exercise.category === 'drill' && "bg-blue-500/20 text-blue-400",
+                                                exercise.category === 'basket' && "bg-purple-500/20 text-purple-400",
+                                                exercise.category === 'points' && "bg-yellow-500/20 text-yellow-400",
+                                                exercise.category === 'game' && "bg-green-500/20 text-green-400"
+                                            )}>
+                                                {exercise.category}
+                                            </span>
+                                        </div>
+
+                                        <h3 className="text-xl font-bold text-white mb-2">{exercise.title}</h3>
+                                        <p className="text-slate-400 text-sm mb-4 line-clamp-3">{exercise.description}</p>
+
+                                        <div className="flex flex-wrap gap-2 text-sm text-slate-500">
+                                            <span className="bg-slate-700/50 px-2 py-1 rounded">{exercise.difficulty}</span>
+                                            <span className="bg-slate-700/50 px-2 py-1 rounded">{exercise.playerCount} players</span>
+                                            {exercise.duration && <span className="bg-slate-700/50 px-2 py-1 rounded">{exercise.duration} min</span>}
+                                            {exercise.focusArea && <span className="bg-slate-700/50 px-2 py-1 rounded">{exercise.focusArea}</span>}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {filteredExercises.length === 0 && (
+                            <div className="text-center py-12">
+                                <p className="text-slate-500 text-lg">No exercises found. Try adjusting your filters.</p>
+                            </div>
+                        )}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
+function DateSelectionModal({ onConfirm }: {
+    onConfirm: (title: string, type: 'practice' | 'match' | 'match-prep', date: string, time: string) => void;
+}) {
+    const [title, setTitle] = useState('');
+    const [sessionType, setSessionType] = useState<'practice' | 'match' | 'match-prep'>('practice');
+    const [date, setDate] = useState('');
+    const [time, setTime] = useState('');
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onConfirm(title, sessionType, date, time);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+            <div className="bg-slate-800 rounded-2xl max-w-lg w-full">
+                <div className="p-6 border-b border-slate-700">
+                    <h2 className="text-2xl font-bold text-white">Plan Your Session</h2>
+                    <p className="text-slate-400 text-sm mt-1">First, let's schedule when this training will happen</p>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Session Title</label>
+                        <input
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder="e.g., Monday Morning Practice"
+                            className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-green-500"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Session Type</label>
+                        <select
+                            value={sessionType}
+                            onChange={(e) => setSessionType(e.target.value as any)}
+                            className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-green-500"
+                        >
+                            <option value="practice">Practice</option>
+                            <option value="match-prep">Match Preparation</option>
+                            <option value="match">Match</option>
+                        </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">Date</label>
+                            <input
+                                type="date"
+                                value={date}
+                                onChange={(e) => setDate(e.target.value)}
+                                className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-green-500"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">Time</label>
+                            <input
+                                type="time"
+                                value={time}
+                                onChange={(e) => setTime(e.target.value)}
+                                className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-green-500"
+                                required
+                            />
+                        </div>
+                    </div>
+
+                    <button
+                        type="submit"
+                        className="w-full px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition font-medium mt-6"
+                    >
+                        Continue to Exercise Selection →
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+}
